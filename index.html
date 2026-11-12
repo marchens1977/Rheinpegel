@@ -178,7 +178,8 @@
                 }
             });
 
-            const pastKeys = Object.keys(pastByDay).sort().slice(-5).reverse();
+            // Chronologisch aufsteigend: Ältester Tag oben, aktuellster vergangener Tag unten
+            const pastKeys = Object.keys(pastByDay).sort().slice(-5);
             if (pastKeys.length > 0) {
                 pastKeys.forEach(key => {
                     const item = pastByDay[key];
@@ -204,6 +205,7 @@
                 }
             });
 
+            // Chronologisch aufsteigend: Tag 1 (morgen) oben bis Tag 5 unten
             const futureKeys = Object.keys(futureByDay).sort().slice(0, 5);
             if (futureKeys.length > 0) {
                 futureKeys.forEach(key => {
@@ -219,22 +221,34 @@
         function renderChart(measurements, forecast) {
             const ctx = document.getElementById('levelChart').getContext('2d');
             
-            const histLabels = measurements.map(d => {
+            // Zeitfenster für das Diagramm exakt auf gestern (00:00) bis morgen (23:59) eingrenzen
+            const yesterdayStart = new Date();
+            yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+            yesterdayStart.setHours(0, 0, 0, 0);
+
+            const dayAfterTomorrowStart = new Date();
+            dayAfterTomorrowStart.setDate(dayAfterTomorrowStart.getDate() + 2);
+            dayAfterTomorrowStart.setHours(0, 0, 0, 0);
+
+            const chartMeasurements = measurements.filter(m => new Date(m.timestamp) >= yesterdayStart);
+            const chartForecast = forecast.filter(f => new Date(f.timestamp) < dayAfterTomorrowStart);
+
+            const histLabels = chartMeasurements.map(d => {
                 const date = new Date(d.timestamp);
                 return date.toLocaleDateString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
             });
-            const foreLabels = forecast.map(d => {
+            const foreLabels = chartForecast.map(d => {
                 const date = new Date(d.timestamp);
                 return date.toLocaleDateString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
             });
 
             const allLabels = histLabels.concat(foreLabels);
-            const histValues = measurements.map(d => d.value).concat(new Array(forecast.length).fill(null));
+            const histValues = chartMeasurements.map(d => d.value).concat(new Array(chartForecast.length).fill(null));
             
-            let foreValues = new Array(measurements.length).fill(null);
-            if (forecast.length > 0 && measurements.length > 0) {
-                foreValues[measurements.length - 1] = measurements[measurements.length - 1].value;
-                foreValues = foreValues.concat(forecast.map(d => d.value));
+            let foreValues = new Array(chartMeasurements.length).fill(null);
+            if (chartForecast.length > 0 && chartMeasurements.length > 0) {
+                foreValues[chartMeasurements.length - 1] = chartMeasurements[chartMeasurements.length - 1].value;
+                foreValues = foreValues.concat(chartForecast.map(d => d.value));
             }
 
             if (chartInstance) {
@@ -251,7 +265,7 @@
                 backgroundColor: 'rgba(49, 130, 206, 0.1)'
             }];
 
-            if (forecast.length > 0) {
+            if (chartForecast.length > 0) {
                 datasets.push({
                     label: 'Prognose (cm)',
                     data: foreValues,
@@ -276,7 +290,7 @@
                         x: { ticks: { maxTicksLimit: 6 } }
                     },
                     plugins: {
-                        legend: { display: forecast.length > 0 }
+                        legend: { display: chartForecast.length > 0 }
                     }
                 }
             });
