@@ -55,8 +55,14 @@
 
         async function init() {
             try {
-                const response = await fetch('https://pegelonline.wsv.de/webservices/rest-api/v2/stations.json?water=RHEIN');
-                stations = await response.json();
+                const response = await fetch('https://pegelonline.wsv.de/webservices/rest-api/v2/stations.json?waters=RHEIN');
+                const allStations = await response.json();
+                
+                // Strikt nur Rhein-Stationen filtern und alphabetisch sortieren
+                stations = allStations
+                    .filter(s => s.water && s.water.shortname && s.water.shortname.toUpperCase() === 'RHEIN')
+                    .sort((a, b) => a.shortname.trim().localeCompare(b.shortname.trim(), 'de', { sensitivity: 'base' }));
+
                 populateSelect();
                 document.getElementById('statusText').innerText = "Bereit. Bitte Station wählen oder GPS nutzen.";
             } catch (error) {
@@ -67,12 +73,8 @@
         function populateSelect() {
             const select = document.getElementById('stationSelect');
             select.innerHTML = '<option value="">Manuelle Auswahl...</option>';
-            
-            const sortedStations = [...stations].sort((a, b) => 
-                a.shortname.localeCompare(b.shortname, 'de')
-            );
 
-            sortedStations.forEach(station => {
+            stations.forEach(station => {
                 const option = document.createElement('option');
                 option.value = station.uuid;
                 option.textContent = station.shortname + " (" + station.km + " km)";
