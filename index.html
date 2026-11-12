@@ -25,6 +25,7 @@
         .current-val { font-weight: 700; color: #2b6cb0; font-size: 16px; }
         .current-row { background-color: #ebf8ff; border-radius: 6px; padding: 12px 10px; border-bottom: none; margin: 5px -10px; }
         .empty-note { font-size: 13px; color: #718096; padding: 15px 0; text-align: center; }
+        .fallback-link { display: inline-block; margin-top: 10px; padding: 10px 15px; background-color: #edf2f7; color: #2d3748; text-decoration: none; border-radius: 8px; font-weight: 600; border: 1px solid #cbd5e0; }
     </style>
 </head>
 <body>
@@ -161,14 +162,14 @@
                     document.getElementById('statusText').innerText = "";
                     
                     renderChart(measurements, forecast);
-                    renderList(measurements, forecast, latestValue);
+                    renderList(measurements, forecast, latestValue, stationInfo);
                 }
             } catch (error) {
                 document.getElementById('statusText').innerText = "Für diese Station liegen aktuell keine Messwerte vor.";
             }
         }
 
-        function renderList(measurements, forecast, currentVal) {
+        function renderList(measurements, forecast, currentVal, stationInfo) {
             const list = document.getElementById('combinedList');
             list.innerHTML = '';
             
@@ -220,7 +221,8 @@
                     list.innerHTML += `<div class="data-row"><span>${dateStr}</span><span class="forecast-val">${item.value} cm</span></div>`;
                 });
             } else {
-                list.innerHTML += '<div class="empty-note">Für diese Station berechnet das Amt aktuell keine Vorhersage.</div>';
+                const searchUrl = `https://www.google.com/search?q=Hochwasservorhersage+Pegel+${encodeURIComponent(stationInfo.shortname)}`;
+                list.innerHTML += `<div class="empty-note">Pegelonline liefert hierfür keine Daten.<br><a href="${searchUrl}" target="_blank" class="fallback-link">Regionale Prognose suchen</a></div>`;
             }
         }
 
