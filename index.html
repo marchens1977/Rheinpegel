@@ -67,7 +67,12 @@
         function populateSelect() {
             const select = document.getElementById('stationSelect');
             select.innerHTML = '<option value="">Manuelle Auswahl...</option>';
-            stations.forEach(station => {
+            
+            const sortedStations = [...stations].sort((a, b) => 
+                a.shortname.localeCompare(b.shortname, 'de')
+            );
+
+            sortedStations.forEach(station => {
                 const option = document.createElement('option');
                 option.value = station.uuid;
                 option.textContent = station.shortname + " (" + station.km + " km)";
@@ -178,7 +183,6 @@
                 }
             });
 
-            // Chronologisch aufsteigend: Ältester Tag oben, aktuellster vergangener Tag unten
             const pastKeys = Object.keys(pastByDay).sort().slice(-5);
             if (pastKeys.length > 0) {
                 pastKeys.forEach(key => {
@@ -205,7 +209,6 @@
                 }
             });
 
-            // Chronologisch aufsteigend: Tag 1 (morgen) oben bis Tag 5 unten
             const futureKeys = Object.keys(futureByDay).sort().slice(0, 5);
             if (futureKeys.length > 0) {
                 futureKeys.forEach(key => {
@@ -221,7 +224,6 @@
         function renderChart(measurements, forecast) {
             const ctx = document.getElementById('levelChart').getContext('2d');
             
-            // Zeitfenster für das Diagramm exakt auf gestern (00:00) bis morgen (23:59) eingrenzen
             const yesterdayStart = new Date();
             yesterdayStart.setDate(yesterdayStart.getDate() - 1);
             yesterdayStart.setHours(0, 0, 0, 0);
