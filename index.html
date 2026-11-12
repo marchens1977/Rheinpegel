@@ -15,8 +15,14 @@
         button:active { background-color: #2b6cb0; }
         canvas { width: 100% !important; max-height: 250px; margin-top: 20px; }
         .status { text-align: center; font-size: 13px; margin-top: 10px; color: #718096; }
-        .level-text { font-size: 28px; font-weight: bold; color: #2b6cb0; margin: 5px 0 0 0; }
+        .level-text { font-size: 32px; font-weight: bold; color: #2b6cb0; margin: 5px 0 0 0; }
         .station-title { font-size: 18px; margin: 0; color: #1a202c; }
+        .section-title { font-size: 15px; font-weight: 600; color: #4a5568; margin: 22px 0 10px 0; padding-bottom: 5px; border-bottom: 2px solid #edf2f7; }
+        .data-row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid #f7fafc; font-size: 15px; }
+        .data-row:last-child { border-bottom: none; }
+        .data-val { font-weight: 600; color: #2d3748; }
+        .forecast-val { font-weight: 600; color: #dd6b20; }
+        .empty-note { font-size: 13px; color: #718096; padding: 5px 0; }
     </style>
 </head>
 <body>
@@ -35,6 +41,12 @@
         <h2 id="stationName" class="station-title"></h2>
         <p id="currentLevel" class="level-text"></p>
         <canvas id="levelChart"></canvas>
+
+        <div class="section-title">Rückschau (jeweils ca. 12:00 Uhr)</div>
+        <div id="historyList"></div>
+
+        <div class="section-title">Prognose (jeweils ca. 12:00 Uhr)</div>
+        <div id="forecastList"></div>
     </div>
 
     <script>
@@ -62,7 +74,7 @@
                 select.appendChild(option);
             });
             select.addEventListener('change', (event) => {
-                if(event.target.value) {
+                if (event.target.value) {
                     loadStationData(event.target.value);
                 }
             });
@@ -101,59 +113,159 @@
         });
 
         async function loadStationData(uuid) {
-            document.getElementById('statusText').innerText = "Lade historische Wasserstände...";
+            document.getElementById('statusText').innerText = "Lade Wasserstände und Prognose...";
             try {
                 const stationInfo = stations.find(s => s.uuid === uuid);
-                const response = await fetch(`https://pegelonline.wsv.de/webservices/rest-api/v2/stations/${uuid}/W/measurements.json?start=P7D`);
-                const measurements = await response.json();
+                const histResponse = await fetch(`https://pegelonline.wsv.de/webservices/rest-api/v2/stations/${uuid}/W/measurements.json?start=P7D`);
+                const measurements = await histResponse.json();
                 
+                let forecast = [];
+                try {
+                    const foreResponse = await fetch(`https://pegelonline.wsv.de/webservices/rest-api/v2/stations/${uuid}/W/forecast.json`);
+                    if (foreResponse.ok) {
+                        forecast = await foreResponse.json();
+                    }
+                } catch (e) {
+                    forecast = [];
+                }
+
                 if (measurements.length > 0) {
                     const latestValue = measurements[measurements.length - 1].value;
                     document.getElementById('stationName').innerText = stationInfo.shortname;
                     document.getElementById('currentLevel').innerText = latestValue + " cm";
                     document.getElementById('dataCard').style.display = 'block';
                     document.getElementById('statusText').innerText = "";
-                    renderChart(measurements);
+                    
+                    renderChart(measurements, forecast);
+                    renderDailyLists(measurements, forecast);
                 }
             } catch (error) {
                 document.getElementById('statusText').innerText = "Für diese Station liegen aktuell keine Messwerte vor.";
             }
         }
 
-        function renderChart(data) {
-            const ctx = document.getElementById('levelChart').getContext('2d');
-            const labels = data.map(d => {
-                const date = new Date(d.timestamp);
-                return date.toLocaleDateString('de-DE', { weekday: 'short', hour: '2-digit', minute:'2-digit' });
+        function renderDailyLists(measurements, forecast) {
+            const historyList = document.getElementById('historyList');
+            const forecastList = document.getElementById('forecastList');
+            historyList.innerHTML = '';
+            forecastList.innerHTML = '';
+
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+
+            // Rückschau der letzten 5 Tage (jeweils nächster Wert an 12:00 Uhr)
+            const pastByDay = {};
+            measurements.forEach(m => {
+                const d = new Date(m.timestamp);
+                if (d < todayStart) {
+                    const dayKey = d.toISOString().split('T')[0];
+                    const diffToNoon = Math.abs((d.getHours() * 60 + d.getMinutes()) - 720);
+                    if (!pastByDay[dayKey] || diffToNoon < pastByDay[dayKey].diff) {
+                        pastByDay[dayKey] = { date: d, value: m.value, diff: diffToNoon };
+                    }
+                }
             });
-            const values = data.map(d => d.value);
+
+            const pastKeys = Object.keys(pastByDay).sort().slice(-5).reverse();
+            if (pastKeys.length > 0) {
+                pastKeys.forEach(key => {
+                    const item = pastByDay[key];
+                    const dateStr = item.date.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                    historyList.innerHTML += `<div class="data-row"><span>${dateStr}</span><span class="data-val">${item.value} cm</span></div>`;
+                });
+            } else {
+                historyList.innerHTML = '<div class="empty-note">Keine historischen Daten verfügbar.</div>';
+            }
+
+            // Prognose der kommenden 5 Tage (jeweils nächster Wert an 12:00 Uhr)
+            const tomorrowStart = new Date(todayStart);
+            tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+            const futureByDay = {};
+            forecast.forEach(f => {
+                const d = new Date(f.timestamp);
+                if (d >= tomorrowStart) {
+                    const dayKey = d.toISOString().split('T')[0];
+                    const diffToNoon = Math.abs((d.getHours() * 60 + d.getMinutes()) - 720);
+                    if (!futureByDay[dayKey] || diffToNoon < futureByDay[dayKey].diff) {
+                        futureByDay[dayKey] = { date: d, value: f.value, diff: diffToNoon };
+                    }
+                }
+            });
+
+            const futureKeys = Object.keys(futureByDay).sort().slice(0, 5);
+            if (futureKeys.length > 0) {
+                futureKeys.forEach(key => {
+                    const item = futureByDay[key];
+                    const dateStr = item.date.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                    forecastList.innerHTML += `<div class="data-row"><span>${dateStr}</span><span class="forecast-val">${item.value} cm</span></div>`;
+                });
+            } else {
+                forecastList.innerHTML = '<div class="empty-note">Für diese Station berechnet das Amt aktuell keine Vorhersage.</div>';
+            }
+        }
+
+        function renderChart(measurements, forecast) {
+            const ctx = document.getElementById('levelChart').getContext('2d');
+            
+            const histLabels = measurements.map(d => {
+                const date = new Date(d.timestamp);
+                return date.toLocaleDateString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+            });
+            const foreLabels = forecast.map(d => {
+                const date = new Date(d.timestamp);
+                return date.toLocaleDateString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+            });
+
+            const allLabels = histLabels.concat(foreLabels);
+            const histValues = measurements.map(d => d.value).concat(new Array(forecast.length).fill(null));
+            
+            let foreValues = new Array(measurements.length).fill(null);
+            if (forecast.length > 0 && measurements.length > 0) {
+                foreValues[measurements.length - 1] = measurements[measurements.length - 1].value;
+                foreValues = foreValues.concat(forecast.map(d => d.value));
+            }
 
             if (chartInstance) {
                 chartInstance.destroy();
             }
 
+            const datasets = [{
+                label: 'Messwert (cm)',
+                data: histValues,
+                borderColor: '#3182ce',
+                borderWidth: 2,
+                pointRadius: 0,
+                fill: true,
+                backgroundColor: 'rgba(49, 130, 206, 0.1)'
+            }];
+
+            if (forecast.length > 0) {
+                datasets.push({
+                    label: 'Prognose (cm)',
+                    data: foreValues,
+                    borderColor: '#dd6b20',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    fill: false
+                });
+            }
+
             chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Wasserstand (cm)',
-                        data: values,
-                        borderColor: '#3182ce',
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        fill: true,
-                        backgroundColor: 'rgba(49, 130, 206, 0.1)'
-                    }]
+                    labels: allLabels,
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
-                        x: { ticks: { maxTicksLimit: 5 } }
+                        x: { ticks: { maxTicksLimit: 6 } }
                     },
                     plugins: {
-                        legend: { display: false }
+                        legend: { display: forecast.length > 0 }
                     }
                 }
             });
@@ -161,12 +273,12 @@
 
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371; 
-            const dLat = (lat2 - lat1) * (Math.PI/180);
-            const dLon = (lon2 - lon1) * (Math.PI/180);
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * 
-                      Math.sin(dLon/2) * Math.sin(dLon/2); 
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+            const dLat = (lat2 - lat1) * (Math.PI / 180);
+            const dLon = (lon2 - lon1) * (Math.PI / 180);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
             return R * c;
         }
 
