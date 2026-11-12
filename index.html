@@ -112,6 +112,26 @@
             });
         });
 
+        async function fetchForecastData(uuid, latestTimestamp) {
+            const timeseriesCandidates = ['WV', 'W_V'];
+            for (const ts of timeseriesCandidates) {
+                try {
+                    const url = `https://pegelonline.wsv.de/webservices/rest-api/v2/stations/${uuid}/${ts}/measurements.json?start=P1D&end=P5D`;
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        const futureValues = data.filter(item => new Date(item.timestamp).getTime() > latestTimestamp);
+                        if (futureValues.length > 0) {
+                            return futureValues;
+                        }
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+            return [];
+        }
+
         async function loadStationData(uuid) {
             document.getElementById('statusText').innerText = "Lade Wasserstände und Prognose...";
             try {
@@ -119,17 +139,8 @@
                 const histResponse = await fetch(`https://pegelonline.wsv.de/webservices/rest-api/v2/stations/${uuid}/W/measurements.json?start=P7D`);
                 const measurements = await histResponse.json();
                 
-                let forecast = [];
-                try {
-                    const foreResponse = await fetch(`https://pegelonline.wsv.de/webservices/rest-api/v2/stations/${uuid}/WV/measurements.json`);
-                    if (foreResponse.ok) {
-                        const rawForecast = await foreResponse.json();
-                        const latestTimestamp = measurements.length > 0 ? new Date(measurements[measurements.length - 1].timestamp).getTime() : Date.now();
-                        forecast = rawForecast.filter(item => new Date(item.timestamp).getTime() > latestTimestamp);
-                    }
-                } catch (e) {
-                    forecast = [];
-                }
+                const latestTimestamp = measurements.length > 0 ? new Date(measurements[measurements.length - 1].timestamp).getTime() : Date.now();
+                const forecast = await fetchForecastData(uuid, latestTimestamp);
 
                 if (measurements.length > 0) {
                     const latestValue = measurements[measurements.length - 1].value;
