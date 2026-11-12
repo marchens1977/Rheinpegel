@@ -121,9 +121,11 @@
                 
                 let forecast = [];
                 try {
-                    const foreResponse = await fetch(`https://pegelonline.wsv.de/webservices/rest-api/v2/stations/${uuid}/W/forecast.json`);
+                    const foreResponse = await fetch(`https://pegelonline.wsv.de/webservices/rest-api/v2/stations/${uuid}/WV/measurements.json`);
                     if (foreResponse.ok) {
-                        forecast = await foreResponse.json();
+                        const rawForecast = await foreResponse.json();
+                        const latestTimestamp = measurements.length > 0 ? new Date(measurements[measurements.length - 1].timestamp).getTime() : Date.now();
+                        forecast = rawForecast.filter(item => new Date(item.timestamp).getTime() > latestTimestamp);
                     }
                 } catch (e) {
                     forecast = [];
@@ -153,12 +155,11 @@
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
 
-            // Rückschau der letzten 5 Tage (jeweils nächster Wert an 12:00 Uhr)
             const pastByDay = {};
             measurements.forEach(m => {
                 const d = new Date(m.timestamp);
                 if (d < todayStart) {
-                    const dayKey = d.toISOString().split('T')[0];
+                    const dayKey = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
                     const diffToNoon = Math.abs((d.getHours() * 60 + d.getMinutes()) - 720);
                     if (!pastByDay[dayKey] || diffToNoon < pastByDay[dayKey].diff) {
                         pastByDay[dayKey] = { date: d, value: m.value, diff: diffToNoon };
@@ -177,7 +178,6 @@
                 historyList.innerHTML = '<div class="empty-note">Keine historischen Daten verfügbar.</div>';
             }
 
-            // Prognose der kommenden 5 Tage (jeweils nächster Wert an 12:00 Uhr)
             const tomorrowStart = new Date(todayStart);
             tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
@@ -185,7 +185,7 @@
             forecast.forEach(f => {
                 const d = new Date(f.timestamp);
                 if (d >= tomorrowStart) {
-                    const dayKey = d.toISOString().split('T')[0];
+                    const dayKey = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
                     const diffToNoon = Math.abs((d.getHours() * 60 + d.getMinutes()) - 720);
                     if (!futureByDay[dayKey] || diffToNoon < futureByDay[dayKey].diff) {
                         futureByDay[dayKey] = { date: d, value: f.value, diff: diffToNoon };
