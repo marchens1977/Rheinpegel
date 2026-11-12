@@ -89,31 +89,39 @@
                 document.getElementById('statusText').innerText = "Dein Gerät unterstützt keine GPS-Abfrage.";
                 return;
             }
-            document.getElementById('statusText').innerText = "Ermittle deinen aktuellen Standort...";
-            navigator.geolocation.getCurrentPosition(position => {
-                const userLat = position.coords.latitude;
-                const userLon = position.coords.longitude;
-                let closestStation = null;
-                let minDistance = Infinity;
+            document.getElementById('statusText').innerText = "Suche Standort (max. 5 Sekunden)...";
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    const userLat = position.coords.latitude;
+                    const userLon = position.coords.longitude;
+                    let closestStation = null;
+                    let minDistance = Infinity;
 
-                stations.forEach(station => {
-                    if (station.latitude && station.longitude) {
-                        const distance = calculateDistance(userLat, userLon, station.latitude, station.longitude);
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            closestStation = station;
+                    stations.forEach(station => {
+                        if (station.latitude && station.longitude) {
+                            const distance = calculateDistance(userLat, userLon, station.latitude, station.longitude);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                closestStation = station;
+                            }
                         }
-                    }
-                });
+                    });
 
-                if (closestStation) {
-                    document.getElementById('stationSelect').value = closestStation.uuid;
-                    document.getElementById('statusText').innerText = "Nächste Station gefunden.";
-                    loadStationData(closestStation.uuid);
+                    if (closestStation) {
+                        document.getElementById('stationSelect').value = closestStation.uuid;
+                        document.getElementById('statusText').innerText = "Nächste Station gefunden.";
+                        loadStationData(closestStation.uuid);
+                    }
+                }, 
+                error => {
+                    document.getElementById('statusText').innerText = "Standort konnte nicht schnell genug ermittelt werden. Bitte manuell wählen.";
+                }, 
+                {
+                    enableHighAccuracy: false,
+                    timeout: 5000,
+                    maximumAge: 600000
                 }
-            }, error => {
-                document.getElementById('statusText').innerText = "GPS-Zugriff wurde verweigert.";
-            });
+            );
         });
 
         async function fetchForecastData(uuid, latestTimestamp) {
@@ -221,7 +229,7 @@
                     list.innerHTML += `<div class="data-row"><span>${dateStr}</span><span class="forecast-val">${item.value} cm</span></div>`;
                 });
             } else {
-                const searchUrl = `https://duckduckgo.com/?q=!ducky+Hochwasservorhersage+Pegel+${encodeURIComponent(stationInfo.shortname)}`;
+                const searchUrl = `https://www.google.de/search?btnI=1&q=Hochwasservorhersage+Pegel+${encodeURIComponent(stationInfo.shortname)}`;
                 list.innerHTML += `<div class="empty-note">Pegelonline liefert hierfür keine Daten.<br><a href="${searchUrl}" target="_blank" class="fallback-link">Regionale Prognose öffnen</a></div>`;
             }
         }
