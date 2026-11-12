@@ -221,8 +221,8 @@
                     list.innerHTML += `<div class="data-row"><span>${dateStr}</span><span class="forecast-val">${item.value} cm</span></div>`;
                 });
             } else {
-                const searchUrl = `https://www.google.com/search?q=Hochwasservorhersage+Pegel+${encodeURIComponent(stationInfo.shortname)}`;
-                list.innerHTML += `<div class="empty-note">Pegelonline liefert hierfür keine Daten.<br><a href="${searchUrl}" target="_blank" class="fallback-link">Regionale Prognose suchen</a></div>`;
+                const searchUrl = `https://duckduckgo.com/?q=!ducky+Hochwasservorhersage+Pegel+${encodeURIComponent(stationInfo.shortname)}`;
+                list.innerHTML += `<div class="empty-note">Pegelonline liefert hierfür keine Daten.<br><a href="${searchUrl}" target="_blank" class="fallback-link">Regionale Prognose öffnen</a></div>`;
             }
         }
 
