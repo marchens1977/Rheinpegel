@@ -12,8 +12,8 @@ Sie zeigt die aktuellen **Wasserstände des Rheins** an.
 ### Wo ist die App online?
 
 - Code liegt auf GitHub: `marchens1977/Rheinpegel`
-- Vermutlich über **GitHub Pages** erreichbar unter: https://marchens1977.github.io/Rheinpegel/
-  (noch nicht bestätigt – bitte einmal prüfen und hier eintragen)
+- Online über **GitHub Pages** (kostenloser Webseiten-Dienst von GitHub): https://marchens1977.github.io/Rheinpegel/
+  (vom Nutzer am Handy bestätigt)
 
 ### Technischer Aufbau (wichtige Dateien)
 
@@ -46,10 +46,11 @@ Sie zeigt die aktuellen **Wasserstände des Rheins** an.
 | 15.11.2026 | Zoom wieder erlaubt, Chart.js auf 4.4.1 festgelegt, Vorhersage mit zweiter Quelle, GPS-Knopf mit Hinweisen | – |
 | 16.11.2026 | Dieses Projekt-Tagebuch (`CLAUDE.md`) angelegt | #1 |
 | 18.11.2026 | Regel „Hilfsprogramme und Tests gehören ins Projekt“ ergänzt (Abschnitt 8) | #2 |
+| 18.11.2026 | Online-Adresse der App bestätigt und eingetragen | #3 |
 
 ## 4. Offene Ideen / nächste Schritte
 
-- [ ] Prüfen und hier eintragen, unter welcher Adresse die App online ist
+- [x] Prüfen und hier eintragen, unter welcher Adresse die App online ist
 - [ ] Warnfarbe bei sehr hohem oder sehr niedrigem Pegel
 - [ ] Lieblings-Pegel merken (wird beim Öffnen direkt angezeigt)
 - [ ] App auf dem Handy-Startbildschirm ablegen können (wie eine echte App)
