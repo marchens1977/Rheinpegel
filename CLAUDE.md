@@ -44,7 +44,8 @@ Sie zeigt die aktuellen **Wasserstände des Rheins** an.
 | 12.11.2026 | Erste Version der App per Upload auf GitHub hochgeladen | – |
 | 15.11.2026 | App umbenannt in „Rheinpegel“ | – |
 | 15.11.2026 | Zoom wieder erlaubt, Chart.js auf 4.4.1 festgelegt, Vorhersage mit zweiter Quelle, GPS-Knopf mit Hinweisen | – |
-| 16.11.2026 | Dieses Projekt-Tagebuch (`CLAUDE.md`) angelegt | (siehe GitHub) |
+| 16.11.2026 | Dieses Projekt-Tagebuch (`CLAUDE.md`) angelegt | #1 |
+| 18.11.2026 | Regel „Hilfsprogramme und Tests gehören ins Projekt“ ergänzt (Abschnitt 8) | #2 |
 
 ## 4. Offene Ideen / nächste Schritte
 
@@ -71,3 +72,20 @@ Wenn du nicht auf Opus läufst (z. B. Fable) und eine Aufgabe abgeschlossen ist,
 ## 7. Regel zum Tagebuch
 
 **Nach jeder größeren Änderung dieses Tagebuch aktualisieren** (Verlauf, Entscheidungen, offene Ideen).
+
+## 8. Regel: Hilfsprogramme und Tests gehören ins Projekt
+
+1. Automatische Prüfungen (Tests = kleine Programme, die von selbst nachschauen, ob die App noch richtig funktioniert) und Hilfsprogramme, die über eine einzelne Aufgabe hinaus nützlich sind, werden **im Projekt gespeichert** (z. B. Ordner `werkzeuge/` oder `test/`) – nicht nur im Arbeitsbereich der Sitzung, der beim Archivieren verloren geht.
+2. Hier im Tagebuch steht, **wie man sie startet und was sie prüfen**.
+3. **Nach jeder Code-Änderung** die vorhandenen Prüfungen laufen lassen; bei neuen Funktionen passende Prüfpunkte ergänzen.
+4. Gibt es noch keine automatische Prüfung, **bei der nächsten Code-Änderung eine einfache anlegen**.
+5. Was Claude nicht selbst testen kann (z. B. echte Anmeldungen, das echte Handy, den Raspberry Pi), hier im Tagebuch **als Test für den Nutzer** vermerken.
+
+### Vorhandene Prüfungen und Hilfsprogramme
+
+- Noch keine. (Stand 18.11.2026 – wird bei der nächsten Code-Änderung angelegt.)
+
+### Tests für den Nutzer (kann Claude nicht selbst prüfen)
+
+- App auf dem Samsung-Handy in Chrome öffnen: Lädt die Stationsliste? Erscheinen Wasserstand, Diagramm und Vorhersage?
+- GPS-Knopf auf dem Handy ausprobieren: Wird der nächste Pegel gefunden?
