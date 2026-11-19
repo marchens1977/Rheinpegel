@@ -53,6 +53,25 @@
         .fallback-link { display: inline-block; margin-top: 10px; padding: 10px 15px; background-color: var(--blau-zart); color: var(--blau); text-decoration: none; border-radius: 10px; font-weight: 600; border: 2px solid var(--blau); }
         .legend { display: flex; gap: 16px; justify-content: center; font-size: 12px; color: var(--grau); margin-top: 8px; }
         .legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 5px; }
+        /* Einstellungen */
+        details.card { padding: 0; }
+        details.card summary { list-style: none; cursor: pointer; padding: 15px; font-weight: 700; color: var(--blau); font-size: 16px; }
+        details.card summary::-webkit-details-marker { display: none; }
+        details.card summary::after { content: "▾"; float: right; color: var(--orange); }
+        details.card[open] summary::after { content: "▴"; }
+        .settings-body { padding: 0 15px 15px; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e3e8f0; font-size: 15px; gap: 10px; }
+        .setting-row strong { color: var(--blau); }
+        .switch { position: relative; width: 52px; height: 30px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .slider { position: absolute; inset: 0; background: #c3cbd8; border-radius: 30px; transition: .2s; cursor: pointer; }
+        .switch .slider::before { content: ""; position: absolute; width: 24px; height: 24px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+        .switch input:checked + .slider { background: var(--orange); }
+        .switch input:checked + .slider::before { transform: translateX(22px); }
+        .switch input:focus-visible + .slider { outline: 3px solid var(--blau); outline-offset: 2px; }
+        #updateStatus { text-align: left; font-size: 14px; color: var(--text); }
+        .update-banner { background: var(--orange); color: #fff; text-align: center; padding: 10px 15px; font-size: 14px; font-weight: 600; }
+        .update-banner button { width: auto; margin: 0 0 0 10px; padding: 6px 12px; background: #fff; color: var(--orange); border: none; font-size: 14px; }
         footer { text-align: center; font-size: 12px; color: var(--grau); padding: 0 15px 25px; }
         footer a { color: var(--blau); }
     </style>
@@ -62,6 +81,10 @@
         <h1>Rhein<span>pegel</span></h1>
         <div class="subtitle">Wasserstände am Rhein – live von Pegelonline</div>
     </header>
+    <div id="updateBanner" class="update-banner" style="display:none;">
+        <span id="updateBannerText"></span>
+        <button id="btnBannerUpdate" style="display:none;">Jetzt aktualisieren</button>
+    </div>
 
     <main>
     <div class="card">
@@ -86,6 +109,20 @@
         <div class="status" style="text-align:left">Lege Rheinpegel auf deinen Startbildschirm – dann öffnet sie sich wie eine normale App.</div>
         <button id="btnInstall" class="secondary">App installieren</button>
     </div>
+
+    <details class="card" id="settingsCard">
+        <summary>⚙️ Einstellungen</summary>
+        <div class="settings-body">
+            <div class="setting-row"><span>Installierte Version</span><strong id="appVersion">–</strong></div>
+            <div class="setting-row">
+                <label for="autoUpdate" style="font-weight:normal;color:inherit">Updates automatisch installieren</label>
+                <label class="switch"><input type="checkbox" id="autoUpdate"><span class="slider"></span></label>
+            </div>
+            <div id="updateStatus" class="status">Update-Prüfung wird vorbereitet …</div>
+            <button id="btnApplyUpdate" style="display:none;">Update jetzt installieren</button>
+            <button id="btnCheckUpdate" class="secondary">Nach Update suchen</button>
+        </div>
+    </details>
     </main>
 
     <footer>Daten: <a href="https://www.pegelonline.wsv.de" target="_blank" rel="noopener">Pegelonline (WSV)</a></footer>
@@ -434,10 +471,145 @@
             document.getElementById('installCard').style.display = 'none';
         });
 
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').catch(() => {});
+        // --- Updates (über den Service Worker) ---
+        const AUTO_KEY = 'rheinpegel.autoUpdate';
+        function isAutoUpdate() {
+            try { return localStorage.getItem(AUTO_KEY) !== 'aus'; } catch (e) { return true; }
+        }
+        function setAutoUpdate(on) {
+            try { localStorage.setItem(AUTO_KEY, on ? 'an' : 'aus'); } catch (e) {}
+        }
+
+        let swReg = null;
+        let reloading = false;
+        let lastCheck = 0;
+        const hadController = 'serviceWorker' in navigator && !!navigator.serviceWorker.controller;
+
+        function setUpdateStatus(text) {
+            document.getElementById('updateStatus').textContent = text;
+        }
+        function showBanner(text, withButton) {
+            document.getElementById('updateBanner').style.display = text ? 'block' : 'none';
+            document.getElementById('updateBannerText').textContent = text || '';
+            document.getElementById('btnBannerUpdate').style.display = withButton ? 'inline-block' : 'none';
+        }
+
+        // Fragt einen Service Worker nach seiner Versionsnummer.
+        function askVersion(worker) {
+            return new Promise(resolve => {
+                if (!worker) return resolve(null);
+                const channel = new MessageChannel();
+                const timer = setTimeout(() => resolve(null), 3000);
+                channel.port1.onmessage = e => { clearTimeout(timer); resolve(e.data && e.data.version); };
+                worker.postMessage({ type: 'GET_VERSION' }, [channel.port2]);
             });
+        }
+
+        async function showInstalledVersion() {
+            const worker = navigator.serviceWorker.controller || (swReg && swReg.active);
+            const v = await askVersion(worker);
+            document.getElementById('appVersion').textContent = v ? 'Version ' + v : 'unbekannt';
+        }
+
+        function applyUpdate() {
+            const worker = swReg && swReg.waiting;
+            if (!worker) return;
+            setUpdateStatus('Update wird installiert, die App startet gleich neu …');
+            showBanner('Update wird installiert …', false);
+            worker.postMessage({ type: 'SKIP_WAITING' });
+        }
+
+        async function onUpdateReady(worker) {
+            const v = await askVersion(worker);
+            const label = v ? 'Version ' + v : 'eine neue Version';
+            if (isAutoUpdate()) {
+                applyUpdate();
+            } else {
+                setUpdateStatus('Update verfügbar: ' + label + '.');
+                document.getElementById('btnApplyUpdate').style.display = 'block';
+                showBanner('Neues Update verfügbar.', true);
+            }
+        }
+
+        function watchRegistration(reg) {
+            if (reg.waiting && navigator.serviceWorker.controller) onUpdateReady(reg.waiting);
+            reg.addEventListener('updatefound', () => {
+                const worker = reg.installing;
+                if (!worker) return;
+                if (navigator.serviceWorker.controller) setUpdateStatus('Update wird heruntergeladen …');
+                worker.addEventListener('statechange', () => {
+                    if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                        onUpdateReady(worker);
+                    } else if (worker.state === 'activated' && !hadController) {
+                        showInstalledVersion();
+                        setUpdateStatus('Die App ist aktuell und funktioniert jetzt auch ohne Internet.');
+                    } else if (worker.state === 'redundant') {
+                        setUpdateStatus('Update konnte nicht geladen werden. Bitte später erneut versuchen.');
+                    }
+                });
+            });
+        }
+
+        async function checkForUpdate() {
+            if (!swReg) return;
+            lastCheck = Date.now();
+            if (navigator.onLine === false) {
+                setUpdateStatus('Keine Internetverbindung – Prüfung gerade nicht möglich.');
+                return;
+            }
+            setUpdateStatus('Suche nach Updates …');
+            try {
+                await swReg.update();
+                if (!swReg.installing && !swReg.waiting) {
+                    const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                    setUpdateStatus('Die App ist aktuell (geprüft um ' + time + ' Uhr).');
+                }
+            } catch (e) {
+                setUpdateStatus('Prüfung fehlgeschlagen. Bitte später erneut versuchen.');
+            }
+        }
+
+        const autoBox = document.getElementById('autoUpdate');
+        autoBox.checked = isAutoUpdate();
+        autoBox.addEventListener('change', () => {
+            setAutoUpdate(autoBox.checked);
+            if (autoBox.checked && swReg && swReg.waiting) applyUpdate();
+        });
+        document.getElementById('btnCheckUpdate').addEventListener('click', checkForUpdate);
+        document.getElementById('btnApplyUpdate').addEventListener('click', applyUpdate);
+        document.getElementById('btnBannerUpdate').addEventListener('click', applyUpdate);
+
+        if ('serviceWorker' in navigator) {
+            // Neue Version ist aktiv -> Seite einmal neu laden, damit man sie sieht.
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!hadController || reloading) return;
+                reloading = true;
+                location.reload();
+            });
+            window.addEventListener('load', async () => {
+                try {
+                    swReg = await navigator.serviceWorker.register('sw.js');
+                    watchRegistration(swReg);
+                    if (hadController) {
+                        await showInstalledVersion();
+                        if (!swReg.waiting) checkForUpdate();
+                    } else {
+                        // Erster Start: warten, bis die App gespeichert ist
+                        await navigator.serviceWorker.ready;
+                        await showInstalledVersion();
+                        setUpdateStatus('Die App ist aktuell und funktioniert jetzt auch ohne Internet.');
+                    }
+                } catch (e) {
+                    setUpdateStatus('Update-Funktion wird von diesem Browser nicht unterstützt.');
+                }
+            });
+            // Beim Zurückkehren in die App und alle 30 Minuten nach Updates schauen.
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible' && Date.now() - lastCheck > 5 * 60 * 1000) checkForUpdate();
+            });
+            setInterval(checkForUpdate, 30 * 60 * 1000);
+        } else {
+            setUpdateStatus('Update-Funktion wird von diesem Browser nicht unterstützt.');
         }
 
         init();
