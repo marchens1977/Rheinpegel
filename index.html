@@ -4,33 +4,66 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rheinpegel</title>
+    <meta name="theme-color" content="#002D72">
+    <meta name="description" content="Aktuelle Wasserstände und Vorhersage für den Rhein">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="icons/icon-180.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Rheinpegel">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 15px; background-color: #f0f4f8; color: #2d3748; }
-        h1 { font-size: 22px; text-align: center; color: #2b6cb0; margin-bottom: 20px; }
-        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
-        label { font-size: 14px; font-weight: 600; color: #4a5568; }
-        button, select { width: 100%; padding: 14px; margin-top: 10px; border-radius: 8px; border: 1px solid #cbd5e0; font-size: 16px; background-color: #fff; appearance: none; }
-        button { background-color: #3182ce; color: white; border: none; font-weight: 600; margin-top: 15px; }
-        button:active { background-color: #2b6cb0; }
+        /* Farben: Blau und Orange (Mets-Stil) */
+        :root {
+            --blau: #002D72;
+            --blau-hell: #1a4a9a;
+            --blau-zart: #e8eef8;
+            --orange: #FF5910;
+            --orange-dunkel: #d94a0b;
+            --text: #1b2433;
+            --grau: #5b6577;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f2f5fa; color: var(--text); }
+        header { background: var(--blau); color: #fff; padding: 18px 15px 16px; text-align: center; border-bottom: 5px solid var(--orange); }
+        h1 { font-size: 24px; margin: 0; letter-spacing: 0.5px; }
+        h1 span { color: var(--orange); }
+        .subtitle { font-size: 13px; margin-top: 4px; color: #c9d6ee; }
+        main { padding: 15px; max-width: 600px; margin: 0 auto; }
+        .card { background: white; padding: 15px; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,45,114,0.10); margin-bottom: 20px; border-top: 4px solid var(--blau); }
+        label { font-size: 14px; font-weight: 600; color: var(--blau); }
+        button, select { width: 100%; padding: 14px; margin-top: 10px; border-radius: 10px; border: 2px solid var(--blau); font-size: 16px; background-color: #fff; color: var(--text); appearance: none; }
+        button { background-color: var(--orange); border-color: var(--orange); color: white; font-weight: 700; margin-top: 15px; cursor: pointer; }
+        button:active { background-color: var(--orange-dunkel); }
+        button.secondary { background-color: var(--blau); border-color: var(--blau); }
+        button.secondary:active { background-color: var(--blau-hell); }
         canvas { width: 100% !important; max-height: 250px; margin-top: 20px; }
-        .status { text-align: center; font-size: 13px; margin-top: 10px; color: #718096; }
-        .level-text { font-size: 32px; font-weight: bold; color: #2b6cb0; margin: 5px 0 0 0; }
-        .station-title { font-size: 18px; margin: 0; color: #1a202c; }
+        .status { text-align: center; font-size: 13px; margin-top: 10px; color: var(--grau); }
+        .level-text { font-size: 36px; font-weight: 800; color: var(--blau); margin: 5px 0 0 0; }
+        .level-text::after { content: ""; display: block; width: 48px; height: 4px; background: var(--orange); border-radius: 2px; margin-top: 6px; }
+        .station-title { font-size: 18px; margin: 0; color: var(--blau); }
         .list-container { margin-top: 25px; }
-        .data-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #edf2f7; font-size: 15px; }
+        .data-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e3e8f0; font-size: 15px; }
         .data-row:last-child { border-bottom: none; }
-        .data-val { font-weight: 600; color: #2d3748; }
-        .forecast-val { font-weight: 600; color: #dd6b20; }
-        .current-val { font-weight: 700; color: #2b6cb0; font-size: 16px; }
-        .current-row { background-color: #ebf8ff; border-radius: 6px; padding: 12px 10px; border-bottom: none; margin: 5px -10px; }
-        .empty-note { font-size: 13px; color: #718096; padding: 15px 0; text-align: center; }
-        .fallback-link { display: inline-block; margin-top: 10px; padding: 10px 15px; background-color: #edf2f7; color: #2d3748; text-decoration: none; border-radius: 8px; font-weight: 600; border: 1px solid #cbd5e0; }
+        .data-val { font-weight: 600; color: var(--text); }
+        .forecast-val { font-weight: 700; color: var(--orange); }
+        .current-val { font-weight: 800; color: #fff; font-size: 16px; }
+        .current-row { background-color: var(--blau); color: #fff; border-radius: 8px; padding: 12px 10px; border-bottom: none; margin: 5px -10px; }
+        .empty-note { font-size: 13px; color: var(--grau); padding: 15px 0; text-align: center; }
+        .fallback-link { display: inline-block; margin-top: 10px; padding: 10px 15px; background-color: var(--blau-zart); color: var(--blau); text-decoration: none; border-radius: 10px; font-weight: 600; border: 2px solid var(--blau); }
+        .legend { display: flex; gap: 16px; justify-content: center; font-size: 12px; color: var(--grau); margin-top: 8px; }
+        .legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 5px; }
+        footer { text-align: center; font-size: 12px; color: var(--grau); padding: 0 15px 25px; }
+        footer a { color: var(--blau); }
     </style>
 </head>
 <body>
-    <h1>Rheinpegel</h1>
+    <header>
+        <h1>Rhein<span>pegel</span></h1>
+        <div class="subtitle">Wasserstände am Rhein – live von Pegelonline</div>
+    </header>
 
+    <main>
     <div class="card">
         <label for="stationSelect">Messstation auswählen</label>
         <select id="stationSelect">
@@ -44,8 +77,18 @@
         <h2 id="stationName" class="station-title"></h2>
         <p id="currentLevel" class="level-text"></p>
         <canvas id="levelChart"></canvas>
+        <div class="legend"><span><i style="background:#002D72"></i>Messwert</span><span><i style="background:#FF5910"></i>Prognose</span></div>
         <div id="combinedList" class="list-container"></div>
     </div>
+
+    <div class="card" id="installCard" style="display:none;">
+        <label>Rheinpegel als App</label>
+        <div class="status" style="text-align:left">Lege Rheinpegel auf deinen Startbildschirm – dann öffnet sie sich wie eine normale App.</div>
+        <button id="btnInstall" class="secondary">App installieren</button>
+    </div>
+    </main>
+
+    <footer>Daten: <a href="https://www.pegelonline.wsv.de" target="_blank" rel="noopener">Pegelonline (WSV)</a></footer>
 
     <script>
         let stations = [];
@@ -62,9 +105,26 @@
 
                 populateSelect();
                 document.getElementById('statusText').innerText = "Bereit. Bitte Station wählen oder GPS nutzen.";
+
+                // Zuletzt gewählten Pegel direkt wieder anzeigen
+                const saved = loadSavedStation();
+                if (saved && stations.some(s => s.uuid === saved)) {
+                    document.getElementById('stationSelect').value = saved;
+                    loadStationData(saved);
+                }
             } catch (error) {
-                document.getElementById('statusText').innerText = "Fehler beim Abrufen der Pegelstationen.";
+                document.getElementById('statusText').innerText = navigator.onLine === false
+                    ? "Keine Internetverbindung. Bitte später erneut öffnen."
+                    : "Fehler beim Abrufen der Pegelstationen.";
             }
+        }
+
+        const STORAGE_KEY = 'rheinpegel.station';
+        function saveStation(uuid) {
+            try { localStorage.setItem(STORAGE_KEY, uuid); } catch (e) {}
+        }
+        function loadSavedStation() {
+            try { return localStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
         }
 
         function populateSelect() {
@@ -163,6 +223,7 @@
 
         async function loadStationData(uuid) {
             document.getElementById('statusText').innerText = "Lade Wasserstände und Prognose...";
+            saveStation(uuid);
             try {
                 const stationInfo = stations.find(s => s.uuid === uuid);
                 const histResponse = await fetch(`https://pegelonline.wsv.de/webservices/rest-api/v2/stations/${uuid}/W/measurements.json?start=P7D`);
@@ -286,11 +347,11 @@
             const datasets = [{
                 label: 'Messwert',
                 data: histValues,
-                borderColor: '#3182ce',
+                borderColor: '#002D72',
                 borderWidth: 2,
                 pointRadius: 0,
                 fill: true,
-                backgroundColor: 'rgba(49, 130, 206, 0.1)',
+                backgroundColor: 'rgba(0, 45, 114, 0.10)',
                 spanGaps: true
             }];
 
@@ -298,8 +359,8 @@
                 datasets.push({
                     label: 'Prognose',
                     data: foreValues,
-                    borderColor: '#dd6b20',
-                    borderWidth: 2,
+                    borderColor: '#FF5910',
+                    borderWidth: 3,
                     borderDash: [5, 5],
                     pointRadius: 0,
                     fill: false,
@@ -330,7 +391,7 @@
                                 drawOnChartArea: true,
                                 color: function(context) {
                                     if (context.tick && labels[context.index] !== '') {
-                                        return '#cbd5e0';
+                                        return '#d5dce8';
                                     }
                                     return 'transparent';
                                 }
@@ -353,6 +414,30 @@
                       Math.sin(dLon / 2) * Math.sin(dLon / 2); 
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
             return R * c;
+        }
+
+        // --- Installierbare App (PWA) ---
+        let installPrompt = null;
+        window.addEventListener('beforeinstallprompt', event => {
+            event.preventDefault();
+            installPrompt = event;
+            document.getElementById('installCard').style.display = 'block';
+        });
+        document.getElementById('btnInstall').addEventListener('click', async () => {
+            if (!installPrompt) return;
+            installPrompt.prompt();
+            await installPrompt.userChoice;
+            installPrompt = null;
+            document.getElementById('installCard').style.display = 'none';
+        });
+        window.addEventListener('appinstalled', () => {
+            document.getElementById('installCard').style.display = 'none';
+        });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {});
+            });
         }
 
         init();

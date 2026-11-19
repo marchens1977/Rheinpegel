@@ -1,0 +1,7 @@
+{
+  "name": "rheinpegel-test",
+  "private": true,
+  "description": "Automatische Prüfung der Rheinpegel-App",
+  "scripts": { "test": "node app-test.js" },
+  "devDependencies": { "chart.js": "4.4.1" }
+}

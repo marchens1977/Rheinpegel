@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#002D72"/>
+  <!-- Pegellatte -->
+  <rect x="226" y="110" width="60" height="250" rx="8" fill="#ffffff"/>
+  <g fill="#002D72">
+    <rect x="226" y="140" width="34" height="10"/>
+    <rect x="226" y="180" width="22" height="10"/>
+    <rect x="226" y="220" width="34" height="10"/>
+    <rect x="226" y="260" width="22" height="10"/>
+    <rect x="226" y="300" width="34" height="10"/>
+  </g>
+  <!-- Wellen -->
+  <path d="M96 330 q40 -34 80 0 t80 0 t80 0 t80 0 V402 H96 Z" fill="#FF5910"/>
+  <path d="M96 372 q40 -30 80 0 t80 0 t80 0 t80 0" fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round"/>
+</svg>
