@@ -21,7 +21,7 @@ Sie zeigt die aktuellen **Wasserstände des Rheins** an.
 |---|---|
 | `index.html` | Die komplette App: Aussehen (CSS), Inhalt (HTML) und Logik (JavaScript) in einer Datei |
 | `manifest.webmanifest` | „Ausweis“ der App: Name, Farben, Symbol – damit man sie installieren kann |
-| `sw.js` | Service Worker (kleiner Helfer im Browser): speichert die App-Dateien, damit sie installierbar ist und ohne Netz startet. **Bei Änderungen an App-Dateien die Versionsnummer `rheinpegel-vX` erhöhen.** |
+| `sw.js` | Service Worker (kleiner Helfer im Browser): speichert die App-Dateien, damit sie installierbar ist, ohne Netz startet und Updates erkennt. Enthält die **Versionsnummer** (`const VERSION = '…'`). |
 | `icons/` | App-Symbol (`icon.svg` = Vorlage, PNGs in 180/192/512 Pixel) |
 | `werkzeuge/icons-erzeugen.js` | Macht aus `icon.svg` die PNG-Symbole |
 | `test/` | Automatische Prüfung (siehe Abschnitt 8) |
@@ -32,7 +32,7 @@ Sie zeigt die aktuellen **Wasserstände des Rheins** an.
   - Stationsliste: `stations.json?water=RHEIN`
   - Messwerte der letzten 7 Tage: `.../W/measurements.json?start=P7D`
   - Vorhersage: `.../W/forecast.json`, falls dort nur alte Werte stehen, wird eine zweite Quelle abgefragt
-- Wichtige Funktionen in `index.html`: `init`, `populateSelect`, `loadStationData`, `fetchForecastData`, `renderList`, `renderChart`, `calculateDistance`, `saveStation`/`loadSavedStation` (Lieblings-Pegel).
+- Wichtige Funktionen in `index.html`: `init`, `populateSelect`, `loadStationData`, `fetchForecastData`, `renderList`, `renderChart`, `calculateDistance`, `saveStation`/`loadSavedStation` (Lieblings-Pegel), `checkForUpdate`/`applyUpdate`/`onUpdateReady` (Updates).
 - Kein Server, keine Datenbank, keine Installation nötig – die Datei läuft direkt im Browser.
 
 ## 2. Wichtige Regeln und Entscheidungen
@@ -43,6 +43,12 @@ Sie zeigt die aktuellen **Wasserstände des Rheins** an.
 - **Farben: Mets-Stil** – Blau `#002D72` und Orange `#FF5910` (als Farb-Variablen `--blau` / `--orange` oben im CSS). Nur die Farben, kein Mets-Logo (Markenrecht).
 - **Installierbar als Web-App (PWA), keine APK.** Grund: Die App braucht nur Internet und GPS – das kann der Browser. Eine PWA aktualisiert sich von selbst über GitHub Pages, eine APK müsste man bei jeder Änderung neu bauen und neu installieren.
 - Pegeldaten werden **nie** zwischengespeichert (immer live); nur die App-Dateien werden für den Offline-Start gespeichert.
+- **Updates:** Die App startet immer aus ihrem Speicher (gleiche Version, bis ein Update installiert wird). Ein Update gibt es, sobald sich die `VERSION` in `sw.js` ändert.
+  - **⚠️ Regel: Bei JEDER Änderung an `index.html`, `manifest.webmanifest` oder `icons/` die `VERSION` in `sw.js` um 1 erhöhen.** Sonst bekommen installierte Apps die Änderung nie. Der Test prüft das (Vergleich mit `main`).
+  - Unter **⚙️ Einstellungen**: installierte Version, Knopf „Nach Update suchen“, Schalter „Updates automatisch installieren“ (Standard: an, wird im Browser gemerkt).
+  - Automatik an: Update wird heruntergeladen, installiert und die App lädt einmal neu. Automatik aus: orange Hinweis-Leiste oben + Knopf „Update jetzt installieren“.
+  - Die App sucht beim Öffnen, beim Zurückkehren in die App (höchstens alle 5 Minuten) und alle 30 Minuten nach Updates.
+  - GitHub Pages braucht nach dem Mergen ca. 1–10 Minuten, bis das Update für Handys sichtbar ist.
 - Der zuletzt gewählte Pegel wird im Browser gemerkt (`localStorage`) und beim Öffnen direkt angezeigt.
 - Gearbeitet wird in einem **eigenen Arbeitszweig** (Branch = Kopie des Codes zum Ausprobieren); in die Hauptversion (`main`) kommt es über einen **Pull Request** (Änderungsvorschlag).
 
@@ -57,6 +63,7 @@ Sie zeigt die aktuellen **Wasserstände des Rheins** an.
 | 18.11.2026 | Regel „Hilfsprogramme und Tests gehören ins Projekt“ ergänzt (Abschnitt 8) | #2 |
 | 18.11.2026 | Online-Adresse der App bestätigt und eingetragen | #3 |
 | 19.11.2026 | Neues Design in Blau/Orange (Mets-Farben), installierbar als Web-App (PWA) mit Symbol und Offline-Start, Lieblings-Pegel wird gemerkt, erste automatische Prüfung angelegt | #4 |
+| 19.11.2026 | Einstellungen mit Update-Anzeige, „Nach Update suchen“ und automatischen Updates (Version 2) | #5 |
 
 ## 4. Offene Ideen / nächste Schritte
 
@@ -101,6 +108,9 @@ Wenn du nicht auf Opus läufst (z. B. Fable) und eine Aufgabe abgeschlossen ist,
   - Startet einen kleinen lokalen Webserver und öffnet die App in einem unsichtbaren Browser in Handy-Größe.
   - Pegelonline wird durch **Beispieldaten** ersetzt (in der Claude-Umgebung ist Pegelonline gesperrt). Chart.js kommt aus einer lokalen Kopie (gleiche Version 4.4.1, über `npm install`).
   - Prüft: Manifest und Symbole, Chart.js-Version, Zoom erlaubt, Farben, Stationsliste (nur Rhein, sortiert), Wasserstand, Vorhersage, Diagramm, Lieblings-Pegel, Service Worker aktiv, Start ohne Internet, keine JavaScript-Fehler.
+  - Prüft außerdem die **Updates**: Version wird in den Einstellungen angezeigt; der Testserver liefert eine „neue“ Versionsnummer aus → mit Automatik aus erscheinen Hinweis und Knopf, Klick installiert das Update; mit Automatik an wird es von selbst installiert.
+  - Prüft, ob die `VERSION` in `sw.js` erhöht wurde, wenn App-Dateien gegenüber `main` geändert sind.
+  - Einmalig (nicht gespeichert) geprüft am 19.11.2026: Handys mit der alten Version 1 wechseln beim nächsten Öffnen von selbst auf Version 2.
 - **`werkzeuge/icons-erzeugen.js`** – erzeugt die PNG-Symbole aus `icons/icon.svg`. Start: `node werkzeuge/icons-erzeugen.js`
 
 ### Tests für den Nutzer (kann Claude nicht selbst prüfen) – zum Abhaken
@@ -112,3 +122,5 @@ Wenn du nicht auf Opus läufst (z. B. Fable) und eine Aufgabe abgeschlossen ist,
 - [ ] Installierte App öffnet sich ohne Browser-Leiste, oben in Blau
 - [ ] App schließen und wieder öffnen: Wird der zuletzt gewählte Pegel direkt angezeigt?
 - [ ] Flugmodus an, App öffnen: Startet sie und zeigt einen verständlichen Hinweis statt einer leeren Seite?
+- [ ] ⚙️ Einstellungen öffnen: Steht dort „Version 2“ und „Die App ist aktuell“?
+- [ ] Beim nächsten Update (Version 3): Automatik an → wechselt die App nach dem Öffnen von selbst auf Version 3? Automatik aus → erscheint die orange Leiste „Neues Update verfügbar“?

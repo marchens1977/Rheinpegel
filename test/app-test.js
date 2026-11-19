@@ -6,6 +6,10 @@ const { chromium } = require('playwright');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
+
+// Für die Update-Prüfung: Der Testserver kann eine "neue" Versionsnummer in sw.js ausliefern.
+let swVersionUeberschreiben = null;
 
 const ROOT = path.join(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png',
@@ -41,8 +45,12 @@ function server() {
       if (p === '/' || p === '') p = '/index.html';
       const datei = path.join(ROOT, p);
       if (!datei.startsWith(ROOT) || !fs.existsSync(datei)) { res.writeHead(404); return res.end(); }
-      res.writeHead(200, { 'Content-Type': TYPES[path.extname(datei)] || 'application/octet-stream' });
-      res.end(fs.readFileSync(datei));
+      res.writeHead(200, { 'Content-Type': TYPES[path.extname(datei)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+      let inhalt = fs.readFileSync(datei);
+      if (p === '/sw.js' && swVersionUeberschreiben) {
+        inhalt = inhalt.toString().replace(/const VERSION = '[^']*'/, `const VERSION = '${swVersionUeberschreiben}'`);
+      }
+      res.end(inhalt);
     });
     s.listen(0, () => resolve(s));
   });
@@ -60,6 +68,22 @@ function server() {
   pruefe(html.includes('chart.js@4.4.1'), 'Chart.js ist fest auf 4.4.1');
   pruefe(!/user-scalable\s*=\s*no|maximum-scale\s*=\s*1/.test(html), 'Zoom ist erlaubt');
   pruefe(/#002D72/i.test(html) && /#FF5910/i.test(html), 'Farben Blau (#002D72) und Orange (#FF5910) verwendet');
+  const swText = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
+  const VERSION = (swText.match(/const VERSION = '([^']*)'/) || [])[1];
+  pruefe(!!VERSION, 'sw.js enthält eine Versionsnummer (' + VERSION + ')');
+
+  // Wurde die Versionsnummer erhöht, falls sich App-Dateien gegenüber main geändert haben?
+  try {
+    const geaendert = execSync('git diff --name-only origin/main -- index.html manifest.webmanifest icons', { cwd: ROOT }).toString().trim();
+    if (geaendert) {
+      const swDiff = execSync('git diff origin/main -- sw.js', { cwd: ROOT }).toString();
+      pruefe(/^\+const VERSION/m.test(swDiff), 'App-Dateien geändert -> Versionsnummer in sw.js wurde erhöht');
+    } else {
+      console.log('  (keine App-Dateien gegenüber main geändert – Versionsprüfung entfällt)');
+    }
+  } catch (e) {
+    console.log('  (git/origin/main nicht verfügbar – Versionsprüfung übersprungen)');
+  }
 
   // 2) App im Browser prüfen
   const srv = await server();
@@ -124,14 +148,50 @@ function server() {
   pruefe((await page.textContent('h1')).includes('Rhein'), 'App startet auch ohne Internet (aus dem Speicher)');
   await context.setOffline(false);
 
+  // Einstellungen und Updates
+  console.log('Einstellungen und Updates:');
+  await page.reload();
+  await page.click('#settingsCard summary');
+  await page.waitForFunction(v => document.getElementById('appVersion').textContent === 'Version ' + v, VERSION, { timeout: 10000 });
+  pruefe(true, 'Einstellungen zeigen die installierte Version ' + VERSION);
+  pruefe(await page.isChecked('#autoUpdate'), 'Automatische Updates sind am Anfang eingeschaltet');
+  await page.waitForFunction(() => /aktuell/.test(document.getElementById('updateStatus').textContent), null, { timeout: 10000 });
+  pruefe(true, 'Ohne neue Version meldet die App "aktuell"');
+
+  // a) Automatik AUS: Update wird angezeigt, Installation per Knopf
+  await page.click('.switch .slider');
+  pruefe(!(await page.isChecked('#autoUpdate')), 'Schalter lässt sich ausschalten');
+  swVersionUeberschreiben = 'test-hand';
+  await page.click('#btnCheckUpdate');
+  await page.waitForSelector('#btnApplyUpdate', { state: 'visible', timeout: 15000 });
+  pruefe(/Update verfügbar: Version test-hand/.test(await page.textContent('#updateStatus')), 'Neues Update wird in den Einstellungen angezeigt');
+  pruefe(await page.isVisible('#updateBanner'), 'Hinweis-Leiste oben zeigt das Update an');
+  await Promise.all([page.waitForEvent('load', { timeout: 15000 }), page.click('#btnApplyUpdate')]);
+  await page.waitForFunction(() => document.getElementById('appVersion').textContent === 'Version test-hand', null, { timeout: 10000 });
+  pruefe(true, 'Nach Klick auf "Update jetzt installieren" läuft die neue Version');
+  pruefe(!(await page.isChecked('#autoUpdate')), 'Einstellung "Automatik aus" bleibt nach dem Update erhalten');
+
+  // b) Automatik AN: Update wird von selbst installiert
+  await page.click('#settingsCard summary');
+  await page.click('.switch .slider');
+  swVersionUeberschreiben = 'test-auto';
+  await Promise.all([page.waitForEvent('load', { timeout: 15000 }), page.click('#btnCheckUpdate')]);
+  await page.waitForFunction(() => document.getElementById('appVersion').textContent === 'Version test-auto', null, { timeout: 10000 });
+  pruefe(true, 'Mit Automatik wird das Update von selbst geladen und installiert');
+  pruefe((await page.textContent('h1')).includes('Rhein'), 'App läuft nach dem Update normal weiter');
+  swVersionUeberschreiben = null;
+
   pruefe(jsFehler.length === 0, 'Keine JavaScript-Fehler' + (jsFehler.length ? ': ' + jsFehler.join(' | ') : ''));
 
   if (process.argv.includes('--bild')) {
     fs.mkdirSync(path.join(__dirname, 'screenshots'), { recursive: true });
-    await page.goto(basis);
-    await page.waitForSelector('#dataCard', { state: 'visible' });
-    await page.waitForTimeout(800);
-    await page.screenshot({ path: path.join(__dirname, 'screenshots', 'app.png'), fullPage: true });
+    await page.close();
+    const bild = await context.newPage();
+    await bild.goto(basis);
+    await bild.waitForSelector('#dataCard', { state: 'visible' });
+    await bild.click('#settingsCard summary');
+    await bild.waitForTimeout(1500);
+    await bild.screenshot({ path: path.join(__dirname, 'screenshots', 'app.png'), fullPage: true });
     console.log('Bild gespeichert: test/screenshots/app.png');
   }
 

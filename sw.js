@@ -1,7 +1,10 @@
 // Service Worker = kleiner Helfer im Browser, der die App-Dateien speichert,
-// damit die App installierbar ist und auch ohne Netz startet.
-// Bei Änderungen an den App-Dateien die Versionsnummer erhöhen.
-const CACHE = 'rheinpegel-v1';
+// damit die App installierbar ist, ohne Netz startet und Updates erkennt.
+//
+// WICHTIG: Bei JEDER Änderung an index.html, manifest.webmanifest oder icons/
+// die VERSION unten erhöhen! Nur dann bekommen die Handys das Update.
+const VERSION = '2';
+const CACHE = 'rheinpegel-v' + VERSION;
 const APP_FILES = [
   './',
   './index.html',
@@ -12,32 +15,37 @@ const APP_FILES = [
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.1'
 ];
 
+// Neue Version herunterladen (am Browser-Zwischenspeicher vorbei, damit es wirklich die neueste ist).
+// Sie wird erst aktiv, wenn die App das Signal SKIP_WAITING schickt (Update installieren).
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_FILES)));
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE).then(cache => cache.addAll(APP_FILES.map(url => new Request(url, { cache: 'reload' }))))
+  );
 });
 
+// Alte Versionen aufräumen.
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k.startsWith('rheinpegel-') && k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
+});
+
+self.addEventListener('message', event => {
+  const data = event.data || {};
+  if (data.type === 'SKIP_WAITING') self.skipWaiting();
+  if (data.type === 'GET_VERSION' && event.ports[0]) event.ports[0].postMessage({ version: VERSION });
 });
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  // Pegeldaten immer live holen (nicht speichern).
+  // Pegeldaten immer live holen (nie speichern).
   if (event.request.method !== 'GET' || url.hostname === 'pegelonline.wsv.de') return;
-  // App-Dateien: zuerst Netz (immer neueste Version), ohne Netz aus dem Speicher.
+  // App-Dateien aus dem Speicher dieser Version, sonst aus dem Netz.
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put(event.request, copy));
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request, { ignoreSearch: true }))
+    caches.open(CACHE)
+      .then(cache => cache.match(event.request, { ignoreSearch: true }))
+      .then(cached => cached || fetch(event.request))
   );
 });
